@@ -164,7 +164,82 @@ def handle_command(parts):
         for k in valid_keys:
             response += f"${len(k)}\r\n{k}\r\n"
         return response
+    # INCR key — increase value by 1
+    elif command == "INCR":
+        if len(parts) < 2:
+            return "-ERR wrong number of arguments\r\n"
+        
+        key = parts[1]
+        
+        # If key doesn't exist start from 0
+        if key not in database or is_expired(key):
+            database[key] = {"value": "1", "expires_at": None}
+            save_to_disk()
+            return ":1\r\n"
+        
+        # Get current value
+        current = database[key]["value"]
+        
+        # Check if it's actually a number
+        if not current.isdigit():
+            return "-ERR value is not an integer\r\n"
+        
+        # Increase by 1
+        new_value = int(current) + 1
+        database[key]["value"] = str(new_value)
+        save_to_disk()
+        return f":{new_value}\r\n"
     
+    # DECR key — decrease value by 1
+    elif command == "DECR":
+        if len(parts) < 2:
+            return "-ERR wrong number of arguments\r\n"
+        
+        key = parts[1]
+        
+        # If key doesn't exist start from 0
+        if key not in database or is_expired(key):
+            database[key] = {"value": "-1", "expires_at": None}
+            save_to_disk()
+            return ":-1\r\n"
+        
+        current = database[key]["value"]
+        
+        # Handle negative numbers too
+        try:
+            new_value = int(current) - 1
+        except ValueError:
+            return "-ERR value is not an integer\r\n"
+        
+        database[key]["value"] = str(new_value)
+        save_to_disk()
+        return f":{new_value}\r\n"
+    
+    # INCRBY key amount — increase by specific amount
+    elif command == "INCRBY":
+        if len(parts) < 3:
+            return "-ERR wrong number of arguments\r\n"
+        
+        key = parts[1]
+        
+        try:
+            amount = int(parts[2])
+        except ValueError:
+            return "-ERR value is not an integer\r\n"
+        
+        if key not in database or is_expired(key):
+            database[key] = {"value": str(amount), "expires_at": None}
+            save_to_disk()
+            return f":{amount}\r\n"
+        
+        try:
+            new_value = int(database[key]["value"]) + amount
+        except ValueError:
+            return "-ERR value is not an integer\r\n"
+        
+        database[key]["value"] = str(new_value)
+        save_to_disk()
+        return f":{new_value}\r\n"
     else:
         return f"-ERR unknown command '{command}'\r\n"
 
