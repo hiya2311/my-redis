@@ -82,3 +82,19 @@ redis_data.json — persistence layer (written on every SET/DEL)
 
 Hiya Khurana — BCA Student
 GitHub: https://github.com/hiya2311
+## Performance Analysis
+
+Benchmarked against real Redis (1000 operations):
+
+| Operation | My Redis | Real Redis | Gap |
+|-----------|----------|-------------|-----|
+| SET | 50 ops/sec | 4,012 ops/sec | 80x |
+| GET | 1,144 ops/sec | 4,935 ops/sec | 4.3x |
+
+**Key Finding:** SET is significantly slower than GET due to synchronous 
+disk writes on every command (writing full JSON snapshot per SET). Real 
+Redis avoids this using asynchronous persistence strategies (RDB snapshots 
+and AOF logging).
+
+**Potential Improvement:** Implement write-behind caching — batch writes 
+every N seconds or N operations instead of synchronous writes per command.
