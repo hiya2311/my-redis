@@ -1,8 +1,9 @@
 import threading
 import json
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-from commands import handle_command, database
+from commands import handle_command, database, is_expired
 
 class RedisAPIHandler(BaseHTTPRequestHandler):
     
@@ -34,15 +35,10 @@ class RedisAPIHandler(BaseHTTPRequestHandler):
                 value = response.split("\r\n")[1]
                 self.send_json(200, {"value": value})
         
-        # GET /keys
+        # GET /keys  -- reads database dict directly, no RESP parsing
         elif parsed.path == "/keys":
-            response = handle_command(["KEYS", "*"])
-            if response == "*0\r\n":
-                self.send_json(200, {"keys": []})
-            else:
-                lines = response.strip().split("\r\n")
-                keys = [lines[i] for i in range(len(lines)) if i % 2 == 1 and not lines[i].startswith("*") and not lines[i].startswith("$")]
-                self.send_json(200, {"keys": keys})
+            valid_keys = [k for k in list(database.keys()) if not is_expired(k)]
+            self.send_json(200, {"keys": valid_keys})
         
         # GET /delete?key=name
         elif parsed.path == "/delete":
@@ -53,12 +49,16 @@ class RedisAPIHandler(BaseHTTPRequestHandler):
             response = handle_command(["DEL", key])
             deleted = response.strip() == ":1"
             self.send_json(200, {"deleted": deleted})
-        
+        # GET /all -- returns all keys with their values in ONE request
+elif parsed.path == "/all":
+    valid_keys = [k for k in list(database.keys()) if not is_expired(k)]
+    result = {}
+    for k in valid_keys:
+        result[k] = database[k]["value"]
+    self.send_json(200, {"data": result})
         # GET /stats
         elif parsed.path == "/stats":
-            from commands import database
-            import time
-            valid_keys = [k for k in database.keys()]
+            valid_keys = [k for k in list(database.keys()) if not is_expired(k)]
             self.send_json(200, {
                 "total_keys": len(valid_keys),
                 "keys": valid_keys

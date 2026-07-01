@@ -1,7 +1,9 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify 
+from flask_cors import CORS
 import socket
 
 app = Flask(__name__)
+CORS(app)
 
 def send_to_redis(*args):
     """

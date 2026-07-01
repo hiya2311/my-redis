@@ -4,10 +4,6 @@ from resp_parser import parse_resp
 from commands import handle_command
 
 def handle_client(client_socket, client_address):
-    """
-    This function runs in its own thread for each client
-    So multiple clients can connect at the same time
-    """
     print(f"New client connected: {client_address}")
     
     while True:
@@ -30,8 +26,6 @@ def handle_client(client_socket, client_address):
     
     client_socket.close()
 
-
-# Create server
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind(('localhost', 6380))
@@ -44,8 +38,6 @@ print("Now handling multiple clients simultaneously!")
 while True:
     client_socket, client_address = server.accept()
     
-    # Create a new thread for each client
-    # So every client is handled independently
     thread = threading.Thread(
         target=handle_client,
         args=(client_socket, client_address)

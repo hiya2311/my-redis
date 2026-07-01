@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyRedis Dashboard</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: 'Segoe UI', Arial, sans-serif;
+        background: #0f0f1a;
+        color: #e0e0e0;
+        padding: 30px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { color: #ff4757; margin-bottom: 5px; }
+    .subtitle { color: #888; margin-bottom: 30px; }
+    .card {
+        background: #1a1a2e;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid #2a2a3e;
+    }
+    .card h2 { font-size: 16px; color: #ff4757; margin-bottom: 15px; }
+    .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
+    input {
+        flex: 1;
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #333;
+        background: #0f0f1a;
+        color: #fff;
+        font-size: 14px;
+    }
+    button {
+        padding: 10px 20px;
+        border-radius: 6px;
+        border: none;
+        background: #ff4757;
+        color: white;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+    }
+    button:hover { background: #ff6b81; }
+    .status-badge {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #2ed573;
+        margin-right: 8px;
+    }
+    .status-badge.offline { background: #ff4757; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid #2a2a3e; }
+    th { color: #888; font-size: 12px; text-transform: uppercase; }
+    .delete-btn { background: #2a2a3e; padding: 5px 12px; font-size: 12px; }
+    .delete-btn:hover { background: #ff4757; }
+    .empty-state { text-align: center; padding: 30px; color: #555; }
+    .stats { display: flex; gap: 15px; margin-bottom: 20px; }
+    .stat-box {
+        background: #1a1a2e;
+        border-radius: 10px;
+        padding: 15px 25px;
+        border: 1px solid #2a2a3e;
+        flex: 1;
+        text-align: center;
+    }
+    .stat-number { font-size: 28px; font-weight: bold; color: #ff4757; }
+    .stat-label { font-size: 12px; color: #888; margin-top: 5px; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>MyRedis Dashboard</h1>
+    <p class="subtitle">
+        <span id="statusDot" class="status-badge"></span>
+        <span id="statusText">Checking connection...</span>
+    </p>
+    <div class="stats">
+        <div class="stat-box">
+            <div class="stat-number" id="keyCount">0</div>
+            <div class="stat-label">Total Keys</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-number" id="serverStatus">--</div>
+            <div class="stat-label">Server Status</div>
+        </div>
+    </div>
+    <div class="card">
+        <h2>ADD NEW KEY</h2>
+        <div class="form-row">
+            <input type="text" id="keyInput" placeholder="key (e.g. username)">
+            <input type="text" id="valueInput" placeholder="value (e.g. Hiya)">
+            <button onclick="setKey()">SET</button>
+        </div>
+    </div>
+    <div class="card">
+        <h2>STORED DATA</h2>
+        <table id="dataTable">
+            <thead>
+                <tr>
+                    <th>Key</th>
+                    <th>Value</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="dataBody"></tbody>
+        </table>
+        <div id="emptyState" class="empty-state" style="display:none;">
+            No keys stored yet. Add one above!
+        </div>
+    </div>
+</div>
+
+<script>
+var API_URL = 'http://localhost:5000';
+
+function checkStatus() {
+    fetch(API_URL + '/ping')
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        document.getElementById('statusDot').classList.remove('offline');
+        document.getElementById('statusText').innerText = 'Connected to MyRedis';
+        document.getElementById('serverStatus').innerText = 'ONLINE';
+    })
+    .catch(function(err) {
+        document.getElementById('statusDot').classList.add('offline');
+        document.getElementById('statusText').innerText = 'Cannot connect to server';
+        document.getElementById('serverStatus').innerText = 'OFFLINE';
+    });
+}
+
+function loadKeys() {
+    fetch(API_URL + '/keys')
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        var keys = data.keys || [];
+        document.getElementById('keyCount').innerText = keys.length;
+        var tbody = document.getElementById('dataBody');
+        var emptyState = document.getElementById('emptyState');
+        if (keys.length === 0) {
+            tbody.innerHTML = '';
+            emptyState.style.display = 'block';
+            return;
+        }
+        emptyState.style.display = 'none';
+        var promises = keys.map(function(key) {
+            return fetch(API_URL + '/get/' + key)
+            .then(function(res) {
+                if (!res.ok) return null;
+                return res.json();
+            })
+            .then(function(valData) {
+                if (!valData) return null;
+                return { key: key, value: valData.value };
+            })
+            .catch(function() { return null; });
+        });
+        Promise.all(promises).then(function(results) {
+            var rows = '';
+            results.forEach(function(item) {
+                if (!item) return;
+                rows += '<tr><td>' + item.key + '</td><td>' + item.value + '</td><td><button class="delete-btn" onclick="deleteKey(\'' + item.key + '\')">DELETE</button></td></tr>';
+            });
+            tbody.innerHTML = rows;
+        });
+    })
+    .catch(function(err) {
+        console.error('Error loading keys:', err);
+    });
+}
+
+function setKey() {
+    var key = document.getElementById('keyInput').value.trim();
+    var value = document.getElementById('valueInput').value.trim();
+    if (!key || !value) {
+        alert('Please enter both key and value');
+        return;
+    }
+    fetch(API_URL + '/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: key, value: value })
+    })
+    .then(function() {
+        document.getElementById('keyInput').value = '';
+        document.getElementById('valueInput').value = '';
+        loadKeys();
+    })
+    .catch(function(err) {
+        console.error('Set error:', err);
+    });
+}
+
+function deleteKey(key) {
+    fetch(API_URL + '/del/' + key, { method: 'DELETE' })
+    .then(function() { loadKeys(); })
+    .catch(function(err) { console.error('Delete error:', err); });
+}
+
+checkStatus();
+loadKeys();
+setInterval(function() {
+    checkStatus();
+    loadKeys();
+}, 3000);
+</script>
+</body>
+</html>

@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyRedis Dashboard</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+        font-family: 'Segoe UI', monospace;
+        background: #080810;
+        color: #e0e0e0;
+        min-height: 100vh;
+    }
+
+    /* TOP NAV */
+    .navbar {
+        background: #0d0d1a;
+        border-bottom: 1px solid #ff475730;
+        padding: 15px 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .navbar-brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .redis-logo {
+        width: 32px;
+        height: 32px;
+        background: #ff4757;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 14px;
+        box-shadow: 0 0 15px #ff475760;
+    }
+    .brand-name {
+        font-size: 20px;
+        font-weight: bold;
+        color: #fff;
+        letter-spacing: 1px;
+    }
+    .brand-name span { color: #ff4757; }
+    .status-pill {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #0f0f1a;
+        border: 1px solid #2a2a3e;
+        border-radius: 20px;
+        padding: 6px 14px;
+        font-size: 13px;
+    }
+    .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #2ed573;
+        box-shadow: 0 0 8px #2ed573;
+        animation: pulse 2s infinite;
+    }
+    .dot.offline { background: #ff4757; box-shadow: 0 0 8px #ff4757; animation: none; }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+    }
+
+    /* MAIN LAYOUT */
+    .main { padding: 25px 30px; max-width: 1100px; margin: 0 auto; }
+
+    /* STATS ROW */
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+    .stat-card {
+        background: #0d0d1a;
+        border: 1px solid #1e1e35;
+        border-radius: 12px;
+        padding: 18px 20px;
+        position: relative;
+        overflow: hidden;
+    }
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, #ff4757, transparent);
+    }
+    .stat-label {
+        font-size: 11px;
+        color: #555;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+    }
+    .stat-value {
+        font-size: 26px;
+        font-weight: bold;
+        color: #ff4757;
+        text-shadow: 0 0 20px #ff475750;
+    }
+    .stat-sub { font-size: 11px; color: #444; margin-top: 4px; }
+
+    /* TWO COLUMN LAYOUT */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+
+    /* CARDS */
+    .card {
+        background: #0d0d1a;
+        border: 1px solid #1e1e35;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    .card-header {
+        padding: 14px 18px;
+        border-bottom: 1px solid #1e1e35;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .card-title {
+        font-size: 12px;
+        font-weight: bold;
+        color: #ff4757;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .card-body { padding: 18px; }
+
+    /* FORM */
+    .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
+    input[type=text] {
+        flex: 1;
+        padding: 10px 14px;
+        background: #080810;
+        border: 1px solid #1e1e35;
+        border-radius: 8px;
+        color: #e0e0e0;
+        font-size: 13px;
+        font-family: monospace;
+        outline: none;
+        transition: border 0.2s;
+    }
+    input[type=text]:focus { border-color: #ff475780; }
+    .btn {
+        padding: 10px 18px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: bold;
+        font-family: monospace;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: #ff4757;
+        color: white;
+        box-shadow: 0 0 15px #ff475740;
+    }
+    .btn-primary:hover { background: #ff6b81; box-shadow: 0 0 20px #ff475770; }
+    .btn-ghost {
+        background: #1e1e35;
+        color: #888;
+    }
+    .btn-ghost:hover { background: #2a2a45; color: #fff; }
+
+    /* TERMINAL */
+    .terminal {
+        background: #050508;
+        border: 1px solid #1e1e35;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+    .terminal-header {
+        background: #0d0d1a;
+        padding: 10px 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid #1e1e35;
+    }
+    .term-dot {
+        width: 12px; height: 12px;
+        border-radius: 50%;
+    }
+    .term-dot.red { background: #ff5f57; }
+    .term-dot.yellow { background: #febc2e; }
+    .term-dot.green { background: #28c840; }
+    .terminal-title {
+        font-size: 12px;
+        color: #555;
+        margin-left: 8px;
+    }
+    .terminal-output {
+        padding: 15px;
+        min-height: 160px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+    .term-line { margin-bottom: 2px; }
+    .term-cmd { color: #ff4757; }
+    .term-ok { color: #2ed573; }
+    .term-val { color: #ffa502; }
+    .term-err { color: #ff4757; }
+    .term-info { color: #555; }
+    .terminal-input-row {
+        display: flex;
+        align-items: center;
+        padding: 10px 15px;
+        border-top: 1px solid #1e1e35;
+        gap: 10px;
+    }
+    .term-prompt { color: #ff4757; font-family: monospace; font-size: 13px; white-space: nowrap; }
+    .terminal-input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        color: #e0e0e0;
+        font-family: monospace;
+        font-size: 13px;
+        outline: none;
+    }
+
+    /* TABLE */
+    .search-row { padding: 12px 18px; border-bottom: 1px solid #1e1e35; }
+    .search-input {
+        width: 100%;
+        padding: 8px 12px;
+        background: #080810;
+        border: 1px solid #1e1e35;
+        border-radius: 6px;
+        color: #e0e0e0;
+        font-size: 12px;
+        font-family: monospace;
+        outline: none;
+    }
+    .search-input:focus { border-color: #ff475780; }
+    .table-wrap { max-height: 300px; overflow-y: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+        padding: 10px 15px;
+        text-align: left;
+        font-size: 11px;
+        color: #444;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        border-bottom: 1px solid #1e1e35;
+        position: sticky;
+        top: 0;
+        background: #0d0d1a;
+    }
+    td { padding: 10px 15px; font-size: 13px; border-bottom: 1px solid #0f0f1a; font-family: monospace; }
+    tr:hover td { background: #0f0f1a; }
+    .key-cell { color: #ffa502; }
+    .val-cell { color: #2ed573; }
+    .del-btn {
+        padding: 4px 10px;
+        background: transparent;
+        border: 1px solid #ff475740;
+        border-radius: 4px;
+        color: #ff4757;
+        cursor: pointer;
+        font-size: 11px;
+        font-family: monospace;
+        transition: all 0.2s;
+    }
+    .del-btn:hover { background: #ff475720; border-color: #ff4757; }
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #333;
+        font-size: 13px;
+    }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #0d0d1a; }
+    ::-webkit-scrollbar-thumb { background: #ff475740; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<div class="navbar">
+    <div class="navbar-brand">
+        <div class="redis-logo">R</div>
+        <div class="brand-name">My<span>Redis</span></div>
+    </div>
+    <div class="status-pill">
+        <div class="dot" id="statusDot"></div>
+        <span id="statusText">Connecting...</span>
+    </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+    <!-- STATS -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-label">Total Keys</div>
+            <div class="stat-value" id="keyCount">0</div>
+            <div class="stat-sub">in memory</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Server</div>
+            <div class="stat-value" id="serverStatus" style="font-size:18px">--</div>
+            <div class="stat-sub">port 6380</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Commands Run</div>
+            <div class="stat-value" id="cmdCount">0</div>
+            <div class="stat-sub">this session</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Protocol</div>
+            <div class="stat-value" style="font-size:16px; margin-top:4px">RESP</div>
+            <div class="stat-sub">over TCP</div>
+        </div>
+    </div>
+
+    <!-- TERMINAL + ADD KEY -->
+    <div class="grid-2">
+
+        <!-- TERMINAL -->
+        <div>
+            <div class="terminal">
+                <div class="terminal-header">
+                    <div class="term-dot red"></div>
+                    <div class="term-dot yellow"></div>
+                    <div class="term-dot green"></div>
+                    <div class="terminal-title">myredis-cli — connected to localhost:6380</div>
+                </div>
+                <div class="terminal-output" id="termOutput">
+                    <div class="term-line term-info"># MyRedis Terminal — type commands below</div>
+                    <div class="term-line term-info"># Supported: SET, GET, DEL, EXISTS, TTL, INCR, KEYS, PING</div>
+                </div>
+                <div class="terminal-input-row">
+                    <span class="term-prompt">myredis&gt;</span>
+                    <input class="terminal-input" id="termInput" placeholder="type a command..." autocomplete="off">
+                </div>
+            </div>
+        </div>
+
+        <!-- ADD KEY FORM -->
+        <div>
+            <div class="card" style="height: 100%;">
+                <div class="card-header">
+                    <div class="card-title">Quick Add</div>
+                </div>
+                <div class="card-body">
+                    <div class="input-group">
+                        <input type="text" id="keyInput" placeholder="key">
+                        <input type="text" id="valueInput" placeholder="value">
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="ttlInput" placeholder="TTL in seconds (optional)">
+                        <button class="btn btn-primary" onclick="setKey()">SET</button>
+                    </div>
+                    <div style="margin-top: 12px; display: flex; gap: 8px;">
+                        <button class="btn btn-ghost" onclick="flushAll()" style="font-size:12px;">FLUSH ALL</button>
+                        <button class="btn btn-ghost" onclick="loadKeys()" style="font-size:12px;">REFRESH</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DATA TABLE -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Stored Data</div>
+            <div style="font-size:12px; color:#444;" id="tableCount">0 keys</div>
+        </div>
+        <div class="search-row">
+            <input class="search-input" id="searchInput" placeholder="search keys..." oninput="filterTable()">
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Key</th>
+                        <th>Value</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="dataBody"></tbody>
+            </table>
+            <div id="emptyState" class="empty-state">No keys stored yet.</div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+var API_URL = 'http://localhost:5000';
+var cmdCount = 0;
+var allRows = [];
+
+function checkStatus() {
+    fetch(API_URL + '/ping')
+    .then(function(r) { return r.json(); })
+    .then(function() {
+        document.getElementById('statusDot').classList.remove('offline');
+        document.getElementById('statusText').innerText = 'Connected to MyRedis';
+        document.getElementById('serverStatus').innerText = 'ONLINE';
+    })
+    .catch(function() {
+        document.getElementById('statusDot').classList.add('offline');
+        document.getElementById('statusText').innerText = 'Disconnected';
+        document.getElementById('serverStatus').innerText = 'OFFLINE';
+    });
+}
+
+function loadKeys() {
+    fetch(API_URL + '/keys')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        var keys = data.keys || [];
+        document.getElementById('keyCount').innerText = keys.length;
+        document.getElementById('tableCount').innerText = keys.length + ' keys';
+        var tbody = document.getElementById('dataBody');
+        var emptyState = document.getElementById('emptyState');
+        if (keys.length === 0) {
+            tbody.innerHTML = '';
+            emptyState.style.display = 'block';
+            allRows = [];
+            return;
+        }
+        emptyState.style.display = 'none';
+        var promises = keys.map(function(key) {
+            return fetch(API_URL + '/get/' + key)
+            .then(function(r) { if (!r.ok) return null; return r.json(); })
+            .then(function(d) { if (!d) return null; return { key: key, value: d.value }; })
+            .catch(function() { return null; });
+        });
+        Promise.all(promises).then(function(results) {
+            allRows = results.filter(function(r) { return r !== null; });
+            renderTable(allRows);
+        });
+    })
+    .catch(function(err) { console.error(err); });
+}
+
+function renderTable(rows) {
+    var tbody = document.getElementById('dataBody');
+    var emptyState = document.getElementById('emptyState');
+    if (rows.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+    }
+    emptyState.style.display = 'none';
+    var html = '';
+    rows.forEach(function(item) {
+        html += '<tr><td class="key-cell">' + item.key + '</td><td class="val-cell">' + item.value + '</td><td><button class="del-btn" onclick="deleteKey(\'' + item.key + '\')">DEL</button></td></tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function filterTable() {
+    var search = document.getElementById('searchInput').value.toLowerCase();
+    var filtered = allRows.filter(function(r) {
+        return r.key.toLowerCase().includes(search) || r.value.toLowerCase().includes(search);
+    });
+    renderTable(filtered);
+}
+
+function setKey() {
+    var key = document.getElementById('keyInput').value.trim();
+    var value = document.getElementById('valueInput').value.trim();
+    var ttl = document.getElementById('ttlInput').value.trim();
+    if (!key || !value) { alert('Enter both key and value'); return; }
+    var body = { key: key, value: value };
+    if (ttl) body.ttl = parseInt(ttl);
+    fetch(API_URL + '/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    })
+    .then(function() {
+        document.getElementById('keyInput').value = '';
+        document.getElementById('valueInput').value = '';
+        document.getElementById('ttlInput').value = '';
+        cmdCount++;
+        document.getElementById('cmdCount').innerText = cmdCount;
+        loadKeys();
+    });
+}
+
+function deleteKey(key) {
+    fetch(API_URL + '/del/' + key, { method: 'DELETE' })
+    .then(function() {
+        cmdCount++;
+        document.getElementById('cmdCount').innerText = cmdCount;
+        loadKeys();
+    });
+}
+
+function flushAll() {
+    if (!confirm('Delete ALL keys? This cannot be undone.')) return;
+    fetch(API_URL + '/flush', { method: 'POST' })
+    .then(function() { loadKeys(); });
+}
+
+// TERMINAL
+var termHistory = [];
+var histIndex = -1;
+
+document.getElementById('termInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        var cmd = this.value.trim();
+        if (!cmd) return;
+        termHistory.unshift(cmd);
+        histIndex = -1;
+        this.value = '';
+        runTerminalCommand(cmd);
+    }
+    if (e.key === 'ArrowUp') {
+        histIndex = Math.min(histIndex + 1, termHistory.length - 1);
+        this.value = termHistory[histIndex] || '';
+    }
+    if (e.key === 'ArrowDown') {
+        histIndex = Math.max(histIndex - 1, -1);
+        this.value = histIndex === -1 ? '' : termHistory[histIndex];
+    }
+});
+
+function termPrint(text, cls) {
+    var out = document.getElementById('termOutput');
+    var line = document.createElement('div');
+    line.className = 'term-line ' + (cls || '');
+    line.innerText = text;
+    out.appendChild(line);
+    out.scrollTop = out.scrollHeight;
+}
+
+function runTerminalCommand(cmd) {
+    termPrint('myredis> ' + cmd, 'term-cmd');
+    cmdCount++;
+    document.getElementById('cmdCount').innerText = cmdCount;
+    var parts = cmd.trim().split(/\s+/);
+    var command = parts[0].toUpperCase();
+
+    if (command === 'PING') {
+        fetch(API_URL + '/ping')
+        .then(function(r) { return r.json(); })
+        .then(function() { termPrint('PONG', 'term-ok'); });
+
+    } else if (command === 'SET') {
+        if (parts.length < 3) { termPrint('Usage: SET key value', 'term-err'); return; }
+        fetch(API_URL + '/set', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: parts[1], value: parts[2] })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function() { termPrint('OK', 'term-ok'); loadKeys(); });
+
+    } else if (command === 'GET') {
+        if (parts.length < 2) { termPrint('Usage: GET key', 'term-err'); return; }
+        fetch(API_URL + '/get/' + parts[1])
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.status === 'error') termPrint('(nil)', 'term-info');
+            else termPrint('"' + d.value + '"', 'term-val');
+        });
+
+    } else if (command === 'DEL') {
+        if (parts.length < 2) { termPrint('Usage: DEL key', 'term-err'); return; }
+        fetch(API_URL + '/del/' + parts[1], { method: 'DELETE' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            termPrint(d.deleted ? '(integer) 1' : '(integer) 0', 'term-ok');
+            loadKeys();
+        });
+
+    } else if (command === 'KEYS') {
+        fetch(API_URL + '/keys')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            var keys = d.keys || [];
+            if (keys.length === 0) { termPrint('(empty)', 'term-info'); return; }
+            keys.forEach(function(k, i) { termPrint((i+1) + ') "' + k + '"', 'term-val'); });
+        });
+
+    } else if (command === 'INCR') {
+        if (parts.length < 2) { termPrint('Usage: INCR key', 'term-err'); return; }
+        fetch(API_URL + '/incr/' + parts[1], { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) { termPrint('(integer) ' + d.new_value, 'term-ok'); loadKeys(); });
+
+    } else if (command === 'CLEAR') {
+        document.getElementById('termOutput').innerHTML = '';
+
+    } else {
+        termPrint('Unknown command: ' + command + '. Try: PING SET GET DEL KEYS INCR CLEAR', 'term-err');
+    }
+}
+
+checkStatus();
+loadKeys();
+setInterval(function() { checkStatus(); loadKeys(); }, 5000);
+</script>
+</body>
+</html>
