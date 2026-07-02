@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+
+  redis-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.redis
+    container_name: myredis-server
+    ports:
+      - "6380:6380"
+
+  api-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: myredis-api
+    ports:
+      - "5000:5000"
+    depends_on:
+      - redis-server
+    environment:
+      - REDIS_HOST=redis-server
+
+  dashboard:
+    image: python:3.11-slim
+    container_name: myredis-dashboard
+    working_dir: /app
+    volumes:
+      - ./dashboard.html:/app/dashboard.html
+    ports:
+      - "8000:8000"
+    command: python -m http.server 8000

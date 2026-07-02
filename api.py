@@ -1,3 +1,4 @@
+import os
 from flask import Flask, jsonify 
 from flask_cors import CORS
 import socket
@@ -11,7 +12,8 @@ def send_to_redis(*args):
     and returns the raw response
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(('localhost', 6380))
+    host = os.environ.get('REDIS_HOST', 'localhost')
+    sock.connect((host, 6380))
     
     # Build the RESP command
     command = f"*{len(args)}\r\n"
@@ -135,4 +137,4 @@ def flush_all():
     return jsonify({"status": "success", "message": f"Deleted {len(keys)} keys"})
 if __name__ == '__main__':
     print("Starting HTTP API on http://localhost:5000")
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)
